@@ -1,0 +1,95 @@
+services:
+  product-service:
+    build: ./product_service
+    container_name: product-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@product-db:5432/productdb
+    depends_on:
+      - product-db
+    networks:
+      - app-network
+
+  product-db:
+    image: postgres:15-alpine
+    container_name: product-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: productdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  order-service:
+    build: ./order_service
+    container_name: order-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@order-db:5432/orderdb
+    depends_on:
+      - order-db
+      - rabbitmq
+      - grpc-server
+    networks:
+      - app-network
+
+  order-db:
+    image: postgres:15-alpine
+    container_name: order-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orderdb
+    ports:
+      - "5434:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  grpc-server:
+    build: ./product_service
+    container_name: grpc-server
+    command: python grpc_server.py
+    ports:
+      - "50051:50051"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@product-db:5432/productdb
+    depends_on:
+      - product-db
+    networks:
+      - app-network
+
+  consumer:
+    build: ./product_service
+    container_name: order-consumer
+    command: python consumer.py
+    depends_on:
+      - rabbitmq
+    restart: on-failure
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: on-failure
+    networks:
+      - app-network
+
+volumes:
+  product_db_data:
+  order_db_data:
+
+networks:
+  app-network:
+    driver: bridge

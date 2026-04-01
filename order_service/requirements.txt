@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+pika
+grpcio
+grpcio-tools
+sqlalchemy
+psycopg2-binary
