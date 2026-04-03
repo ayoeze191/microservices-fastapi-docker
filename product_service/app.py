@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from models import Product
@@ -6,12 +7,9 @@ import models
 
 # Create tables automatically on startup
 models.Base.metadata.create_all(bind=engine)
-
-app = FastAPI()
-
-# Seed some products on startup
-@app.on_event("startup")
-def seed_products():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("App starting up!", flush=True)
     db = next(get_db())
     if db.query(Product).count() == 0:
         db.add_all([
@@ -20,6 +18,16 @@ def seed_products():
         ])
         db.commit()
         print("Products seeded! ✅", flush=True)
+
+    yield  # 👈 app runs here (this is where requests are handled)
+
+    # 👇 everything here runs on SHUTDOWN
+    print("App shutting down!", flush=True)
+    db.close()
+app = FastAPI(lifespan=lifespan)
+
+# Seed some products on startup
+
 
 @app.get("/products")
 def get_products(db: Session = Depends(get_db)):

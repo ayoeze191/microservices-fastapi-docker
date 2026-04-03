@@ -6,11 +6,23 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:password@product-db:5432/productdb
+      - REDIS_URL=redis://product-cache:6379
     depends_on:
-      - product-db
+      product-db:
+        condition: service_healthy
+      product-cache:
+        condition: service_started
+    restart: on-failure
     networks:
       - app-network
 
+  product-cache:
+    image: redis:alpine
+    container_name: product-cache
+    ports:
+      - "6380:6379"
+    networks:
+      - app-network
   product-db:
     image: postgres:15-alpine
     container_name: product-db
@@ -22,6 +34,11 @@ services:
       - "5433:5432"
     volumes:
       - product_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - app-network
 
@@ -33,9 +50,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:password@order-db:5432/orderdb
     depends_on:
-      - order-db
-      - rabbitmq
-      - grpc-server
+      order-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      grpc-server:
+        condition: service_started
+    restart: on-failure
     networks:
       - app-network
 
@@ -50,6 +71,11 @@ services:
       - "5434:5432"
     volumes:
       - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - app-network
 
@@ -61,8 +87,11 @@ services:
       - "50051:50051"
     environment:
       - DATABASE_URL=postgresql://postgres:password@product-db:5432/productdb
+      - REDIS_URL=redis://product-cache:6379
     depends_on:
-      - product-db
+      product-db:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - app-network
 
